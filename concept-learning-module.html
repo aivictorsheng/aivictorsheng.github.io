@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>概念学习比喻生成器</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: #f5f5f5;
+                min-height: 100vh;
+                display: flex;
+                padding: 0;
+                margin: 0;
+            }
+
+            .main-container {
+                display: flex;
+                width: 100%;
+                min-height: 100vh;
+            }
+
+            .input-container {
+                flex: 1;
+                max-width: 500px;
+                background: white;
+                padding: 30px;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+                z-index: 10;
+            }
+
+            .content-area {
+                flex: 1;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }
+
+            h1 {
+                text-align: center;
+                color: #333;
+                margin-bottom: 30px;
+                font-size: 24px;
+            }
+
+            .input-group {
+                margin-bottom: 25px;
+            }
+
+            label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #555;
+            }
+
+            textarea {
+                width: 100%;
+                padding: 12px;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                font-size: 14px;
+                font-family: inherit;
+                resize: vertical;
+                transition: border-color 0.3s ease;
+            }
+
+            textarea:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+
+            .submit-btn {
+                width: 100%;
+                padding: 12px;
+                background: #667eea;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background-color 0.2s ease;
+            }
+
+            .submit-btn:hover {
+                background: #5a6fd8;
+            }
+
+            .example {
+                margin-top: 30px;
+                padding: 15px;
+                background: #f8f9fa;
+                border-radius: 6px;
+                font-size: 12px;
+            }
+
+            .example h4 {
+                margin-bottom: 8px;
+                color: #1976d2;
+            }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: 0;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: width 0.3s ease;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sidebar.open {
+            width: calc(100% - 500px);
+        }
+
+            .sidebar-content {
+                padding: 30px;
+                height: 100%;
+                overflow-y: auto;
+            }
+
+            .sidebar-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid #eee;
+            }
+
+            .sidebar-header h2 {
+                color: #333;
+                font-size: 20px;
+                margin: 0;
+            }
+
+            .close-btn {
+                background: none;
+                border: none;
+                font-size: 20px;
+                cursor: pointer;
+                color: #999;
+                padding: 5px;
+            }
+
+            .close-btn:hover {
+                color: #666;
+            }
+
+            .metaphor-content {
+                line-height: 1.6;
+                color: #555;
+                font-size: 16px;
+            }
+
+            .metaphor-content p {
+                margin-bottom: 15px;
+            }
+
+            /* Markdown 样式 */
+            .markdown-content {
+                line-height: 1.6;
+            }
+
+            .markdown-content h1 {
+                font-size: 24px;
+                margin: 20px 0 15px 0;
+                color: #333;
+            }
+
+            .markdown-content h2 {
+                font-size: 20px;
+                margin: 18px 0 12px 0;
+                color: #444;
+            }
+
+            .markdown-content h3 {
+                font-size: 18px;
+                margin: 15px 0 10px 0;
+                color: #555;
+            }
+
+            .markdown-content p {
+                margin-bottom: 15px;
+                color: #555;
+            }
+
+            .markdown-content ul, .markdown-content ol {
+                margin: 15px 0;
+                padding-left: 30px;
+            }
+
+            .markdown-content li {
+                margin-bottom: 8px;
+            }
+
+            .markdown-content code {
+                background: #f4f4f4;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+            }
+
+            .markdown-content pre {
+                background: #f4f4f4;
+                padding: 15px;
+                border-radius: 6px;
+                overflow-x: auto;
+                margin: 15px 0;
+            }
+
+            .markdown-content pre code {
+                background: none;
+                padding: 0;
+            }
+
+            .markdown-content blockquote {
+                border-left: 4px solid #667eea;
+                padding: 10px 20px;
+                margin: 15px 0;
+                background: #f8f9fa;
+                color: #666;
+            }
+
+            .markdown-content a {
+                color: #667eea;
+                text-decoration: none;
+            }
+
+            .markdown-content a:hover {
+                text-decoration: underline;
+            }
+
+            /* Mermaid 图表容器 */
+            .mermaid {
+                text-align: center;
+                margin: 20px 0;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+        </style>
+    </head>
+<body>
+    <div class="main-container">
+        <div class="input-container">
+            <h1>🧠 概念学习比喻生成器</h1>
+            
+            <div class="input-group">
+                <label for="concept">🎯 要学习的概念：</label>
+                <textarea id="concept" placeholder="例如：量子力学、区块链、人工智能..." rows="3"></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label for="context">🎭 语境和故事：</label>
+                <textarea id="context" placeholder="例如：在一个魔法王国里、在厨房里、在太空站中..." rows="3"></textarea>
+            </div>
+            
+            <button class="submit-btn" onclick="generateMetaphor()">✨ 生成比喻</button>
+            
+            <div class="example">
+                <h4>📝 使用示例：</h4>
+                <p><strong>概念：</strong>量子力学</p>
+                <p><strong>语境：</strong>在一个魔法王国里</p>
+                <p><strong>生成比喻：</strong>量子力学就像魔法王国里的"分身术"，一个魔法师可以同时出现在多个地方，但一旦被观察，就只能确定他在其中一个位置。</p>
+            </div>
+        </div>
+
+        <!-- 侧边栏 -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-header">
+                    <h2>💡 生成的比喻故事</h2>
+                    <button class="close-btn" onclick="closeSidebar()">&times;</button>
+                </div>
+                <div class="metaphor-content" id="metaphorContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API配置 - 从配置中读取API密钥
+        const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+        const DEFAULT_MODEL = 'deepseek/deepseek-chat-v3.1:free'; // 默认免费模型
+        const API_KEY = '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'; // 在此处配置您的OpenRouter API密钥
+
+        // 引入Marked.js用于Markdown渲染
+        // 引入Mermaid用于图表渲染
+        function loadExternalScripts() {
+            return new Promise((resolve, reject) => {
+                // 加载Marked.js
+                const markedScript = document.createElement('script');
+                markedScript.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+                markedScript.onload = () => {
+                    console.log('Marked.js loaded successfully');
+                };
+                markedScript.onerror = () => {
+                    console.error('Failed to load Marked.js');
+                };
+                document.head.appendChild(markedScript);
+                
+                // 加载Mermaid
+                const mermaidScript = document.createElement('script');
+                mermaidScript.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js';
+                mermaidScript.onload = () => {
+                    console.log('Mermaid loaded successfully');
+                    // 检测系统主题
+                    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    // 初始化Mermaid
+                    mermaid.initialize({ 
+                        startOnLoad: false,
+                        theme: isDarkMode ? 'dark' : 'default',
+                        securityLevel: 'loose',
+                        fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+                        themeVariables: {
+                            primaryColor: isDarkMode ? '#667eea' : '#667eea',
+                            primaryTextColor: isDarkMode ? '#ffffff' : '#000000',
+                            primaryBorderColor: isDarkMode ? '#5a6fd8' : '#5a6fd8',
+                            lineColor: isDarkMode ? '#cccccc' : '#333333'
+                        },
+                        // 添加更多配置确保图表正确渲染
+                        flowchart: {
+                            useMaxWidth: true,
+                            htmlLabels: true
+                        },
+                        sequence: {
+                            diagramMarginX: 50,
+                            diagramMarginY: 10,
+                            actorMargin: 50
+                        }
+                    });
+                    console.log('Mermaid initialized with theme:', isDarkMode ? 'dark' : 'default');
+                    resolve();
+                };
+                mermaidScript.onerror = () => {
+                    console.error('Failed to load Mermaid');
+                    reject(new Error('Failed to load Mermaid'));
+                };
+                document.head.appendChild(mermaidScript);
+            });
+        }
+        
+        // 监听系统主题变化
+        function watchThemeChanges() {
+            if (window.matchMedia) {
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                mediaQuery.addEventListener('change', (e) => {
+                    const isDarkMode = e.matches;
+                    // 重新初始化Mermaid主题
+                    mermaid.initialize({ 
+                        startOnLoad: false,
+                        theme: isDarkMode ? 'dark' : 'default',
+                        securityLevel: 'loose',
+                        fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+                        themeVariables: {
+                            primaryColor: isDarkMode ? '#667eea' : '#667eea',
+                            primaryTextColor: isDarkMode ? '#ffffff' : '#000000',
+                            primaryBorderColor: isDarkMode ? '#5a6fd8' : '#5a6fd8',
+                            lineColor: isDarkMode ? '#cccccc' : '#333333'
+                        }
+                    });
+                    // 重新渲染所有图表
+                    renderMermaidDiagrams();
+                });
+            }
+        }
+        
+        // 页面加载时加载外部脚本
+        document.addEventListener('DOMContentLoaded', function() {
+            loadExternalScripts().catch(error => {
+                console.error('Failed to load external scripts:', error);
+            });
+            watchThemeChanges();
+        });
+
+        function generateMetaphor() {
+            const concept = document.getElementById('concept').value.trim();
+            const context = document.getElementById('context').value.trim();
+            
+            if (!concept || !context) {
+                alert('请填写完整的概念和语境！');
+                return;
+            }
+            
+            // 显示加载状态
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.add('open');
+            document.getElementById('metaphorContent').innerHTML = '<div style="text-align: center; padding: 50px;"><div class="loading-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px auto;"></div><p style="color: #67eea; font-size: 18px; font-weight: 600;">正在生成比喻故事...</p></div>';
+            
+            // 添加旋转动画样式
+            const style = document.createElement('style');
+            style.innerHTML = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+            document.head.appendChild(style);
+            
+            // 构造prompt
+            const prompt = `请用比喻的方式解释"${concept}"这个概念，将它放在"${context}"这个语境中。要求：
+1. 用生动形象的比喻来解释这个概念
+2. 结合具体的语境故事
+3. 语言通俗易懂，避免专业术语
+4. 使用markdown格式输出，包含标题、段落、列表等
+5. 如果适合，可以加入mermaid流程图或图表来辅助说明
+6. 使用emoji让内容更生动有趣
+7. 直接输出markdown内容`;
+            
+            // 调用OpenRouter API
+            callOpenRouterAPI(prompt)
+                .then(response => {
+                    renderMarkdownContent(response);
+                })
+                .catch(error => {
+                    console.error('API调用错误:', error);
+                    document.getElementById('metaphorContent').innerHTML = `<p>生成失败：${error.message}</p>`;
+                });
+            
+            // 防止页面跳转
+            return false;
+        }
+        
+        async function callOpenRouterAPI(prompt) {
+            if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
+                throw new Error('请在代码中配置OpenRouter API密钥');
+            }
+            
+            console.log('🚀 开始调用OpenRouter API...');
+            console.log('📝 发送的Prompt:', prompt);
+            
+            // 创建AbortController用于超时控制
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.log('⏰ API调用超时 (10分钟)');
+            }, 10 * 60 * 1000); // 10分钟超时
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: DEFAULT_MODEL,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 2000, // 增加max_tokens
+                        stream: true // 启用流式输出
+                    }),
+                    signal: controller.signal // 添加超时信号
+                });
+                
+                console.log('📡 API响应状态:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ API请求失败详情:', errorText);
+                    throw new Error(`API请求失败: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+                
+                // 处理流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulatedContent = '';
+                let buffer = '';
+                let chunkCount = 0;
+                let tokenCount = 0;
+                
+                console.log('📥 开始接收流式响应...');
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    const chunkTime = Date.now() - startTime;
+                    
+                    // 检查是否超时或被中断
+                    if (controller.signal.aborted) {
+                        console.log('⏰ API调用被超时中断');
+                        break;
+                    }
+                    
+                    if (done) {
+                        console.log(`✅ 流式响应接收完成，总耗时: ${chunkTime}ms`);
+                        console.log(`📊 总接收块数: ${chunkCount}, 总字符数: ${accumulatedContent.length}`);
+                        break;
+                    }
+                    
+                    chunkCount++;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // 保留不完整的行
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6).trim();
+                            if (data === '[DONE]') {
+                                console.log(`🏁 收到[DONE]信号，流式传输结束，耗时: ${chunkTime}ms`);
+                                continue;
+                            }
+                            
+                            if (data) {
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    const content = parsed.choices?.[0]?.delta?.content;
+                                    if (content) {
+                                        accumulatedContent += content;
+                                        tokenCount += content.length;
+                                        // 实时更新内容
+                                        renderStreamingContent(accumulatedContent);
+                                        console.log(`📦 块#${chunkCount} - 字符数: ${content.length}, 总字符数: ${accumulatedContent.length}, 耗时: ${chunkTime}ms`);
+                                    }
+                                } catch (e) {
+                                    // 忽略解析错误，可能是不完整的JSON
+                                    console.warn(`⚠️ JSON解析警告 (块#${chunkCount}):`, e.message);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 清除超时定时器
+                clearTimeout(timeoutId);
+                
+                console.log('✅ API调用完成，最终内容长度:', accumulatedContent.length, '字符');
+                // 记录完整的大模型输出
+                console.log('📝 完整大模型输出内容:', accumulatedContent);
+                return accumulatedContent.trim();
+            } catch (error) {
+                // 清除超时定时器
+                clearTimeout(timeoutId);
+                
+                if (error.name === 'AbortError') {
+                    console.error('⏰ API调用超时');
+                    throw new Error('API调用超时，请稍后重试');
+                } else {
+                    console.error('💥 API调用发生错误:', error);
+                    throw new Error(`网络错误: ${error.message}`);
+                }
+            }
+        }
+        
+        function renderStreamingContent(content) {
+            console.log('🔄 实时渲染内容，当前长度:', content.length);
+            try {
+                // 临时包装内容以确保Markdown解析正确
+                const wrappedContent = content;
+                
+                // 使用marked渲染Markdown
+                const htmlContent = marked.parse(wrappedContent);
+                
+                // 设置内容
+                document.getElementById('metaphorContent').innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+                
+                // 渲染Mermaid图表
+                renderMermaidDiagrams();
+                console.log('✅ 实时内容渲染完成');
+            } catch (error) {
+                console.warn('⚠️ 实时渲染过程中出现错误:', error);
+                // 流式渲染过程中可能有不完整的Markdown，暂时忽略错误
+                // 但仍然显示原始内容
+                try {
+                    document.getElementById('metaphorContent').innerHTML = `<div class="markdown-content"><pre>${content}</pre></div>`;
+                } catch (e) {
+                    console.error('💥 显示原始内容时出错:', e);
+                }
+            }
+        }
+        
+        function renderMarkdownContent(markdownText) {
+            console.log('📝 开始渲染完整Markdown内容，长度:', markdownText.length);
+            try {
+                // 使用marked渲染Markdown
+                const htmlContent = marked.parse(markdownText);
+                console.log('✅ Markdown解析完成');
+                
+                // 设置内容
+                document.getElementById('metaphorContent').innerHTML = `<div class="markdown-content">${htmlContent}</div>`;
+                console.log('✅ HTML内容设置完成');
+                
+                // 渲染Mermaid图表
+                renderMermaidDiagrams();
+                console.log('✅ 完整内容渲染完成');
+            } catch (error) {
+                console.error('💥 Markdown渲染错误:', error);
+                document.getElementById('metaphorContent').innerHTML = `<p>内容渲染失败：${error.message}</p><p>${markdownText}</p>`;
+            }
+        }
+        
+        function renderMermaidDiagrams() {
+            console.log('📊 开始渲染Mermaid图表...');
+            // 确保Mermaid库已加载
+            if (typeof mermaid === 'undefined') {
+                console.warn('⚠️ Mermaid库未加载');
+                return;
+            }
+            
+            try {
+                // 查找所有可能包含Mermaid代码的元素
+                const codeBlocks = document.querySelectorAll('pre code.language-mermaid, pre code.language-mermaid code, pre code');
+                console.log(`🔍 找到 ${codeBlocks.length} 个代码块`);
+                
+                const mermaidDiagrams = [];
+                
+                // 收集Mermaid图表代码
+                codeBlocks.forEach((block, index) => {
+                    const codeContent = block.textContent.trim();
+                    // 更精确地检测Mermaid图表
+                    if (codeContent.startsWith('graph') || 
+                        codeContent.startsWith('flowchart') || 
+                        codeContent.startsWith('sequenceDiagram') || 
+                        codeContent.startsWith('classDiagram') || 
+                        codeContent.startsWith('stateDiagram') || 
+                        codeContent.startsWith('erDiagram') || 
+                        codeContent.startsWith('gantt') || 
+                        codeContent.startsWith('pie') || 
+                        codeContent.startsWith('journey') ||
+                        codeContent.startsWith('requirementDiagram') ||
+                        codeContent.startsWith('gitGraph') ||
+                        codeContent.includes('graph TD') ||
+                        codeContent.includes('graph LR') ||
+                        codeContent.includes('graph TB')) {
+                        
+                        // 验证Mermaid语法
+                        if (isValidMermaidSyntax(codeContent)) {
+                            mermaidDiagrams.push({
+                                element: block.parentElement,
+                                code: codeContent,
+                                id: `mermaid-${Date.now()}-${index}`
+                            });
+                            console.log(`📈 检测到Mermaid图表 #${index}:`, codeContent.substring(0, 50) + '...');
+                        } else {
+                            console.warn(`⚠️ 无效的Mermaid语法 #${index}:`, codeContent.substring(0, 50) + '...');
+                        }
+                    }
+                });
+                
+                // 如果没有找到Mermaid图表，直接返回
+                if (mermaidDiagrams.length === 0) {
+                    console.log('📭 未找到有效的Mermaid图表代码');
+                    return;
+                }
+                
+                console.log(`✅ 找到 ${mermaidDiagrams.length} 个Mermaid图表，开始替换...`);
+                
+                // 替换Mermaid代码块为可渲染的图表
+                mermaidDiagrams.forEach((diagram, index) => {
+                    const mermaidDiv = document.createElement('div');
+                    mermaidDiv.className = 'mermaid';
+                    mermaidDiv.id = diagram.id;
+                    mermaidDiv.textContent = diagram.code;
+                    mermaidDiv.style.backgroundColor = '#ffffff';
+                    mermaidDiv.style.borderRadius = '8px';
+                    mermaidDiv.style.padding = '20px';
+                    mermaidDiv.style.margin = '20px 0';
+                    mermaidDiv.style.boxShadow = '0 2px 8px rgba(0, 0, 0.1)';
+                    mermaidDiv.style.overflow = 'auto';
+                    diagram.element.parentNode.replaceChild(mermaidDiv, diagram.element);
+                    console.log(`🔄 图表#${index} 替换完成，ID: ${diagram.id}`);
+                });
+                
+                // 渲染Mermaid图表
+                console.log('🚀 开始渲染Mermaid图表...');
+                
+                // 确保DOM更新完成后再渲染
+                requestAnimationFrame(() => {
+                    try {
+                        // 使用现代的Mermaid API
+                        mermaid.run({
+                            querySelector: '.mermaid',
+                            postRenderCallback: (id) => {
+                                console.log('✅ Mermaid图表渲染完成:', id);
+                            }
+                        }).then(() => {
+                            console.log('✅ 所有Mermaid图表渲染完成');
+                        }).catch((error) => {
+                            console.warn('⚠️ Mermaid渲染失败:', error);
+                            // 降级到传统方法
+                            try {
+                                mermaid.init(undefined, '.mermaid');
+                                console.log('✅ Mermaid降级渲染完成');
+                            } catch (e2) {
+                                console.warn('💥 Mermaid降级渲染也失败了:', e2);
+                            }
+                        });
+                    } catch (e) {
+                        console.warn('⚠️ Mermaid渲染失败，尝试降级方法:', e);
+                        // 降级到传统方法
+                        try {
+                            mermaid.init(undefined, '.mermaid');
+                            console.log('✅ Mermaid降级渲染完成');
+                        } catch (e2) {
+                            console.warn('💥 Mermaid降级渲染也失败了:', e2);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.warn('💥 Mermaid图表渲染过程中出现错误:', error);
+            }
+        }
+        
+        // 验证Mermaid语法的辅助函数
+        function isValidMermaidSyntax(code) {
+            if (!code || code.length === 0) return false;
+            
+            // 基本的语法检查
+            const lines = code.split('\n');
+            if (lines.length < 2) return false;
+            
+            // 检查是否有有效的起始行
+            const firstLine = lines[0].trim();
+            const validStarts = ['graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 
+                               'stateDiagram', 'erDiagram', 'gantt', 'pie', 'journey',
+                               'requirementDiagram', 'gitGraph'];
+            
+            return validStarts.some(start => firstLine.startsWith(start));
+        }
+        
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.remove('open');
+        }
+        
+        // 添加回车键支持
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('concept').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    generateMetaphor();
+                }
+            });
+            
+            document.getElementById('context').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    generateMetaphor();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
