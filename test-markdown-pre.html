@@ -251,6 +251,75 @@
             return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
+        // 启动Mermaid持续检测机制
+        function startMermaidDetection() {
+            let detectionCount = 0;
+            const maxDetections = 50; // 最多检测50次（5秒）
+            const detectionInterval = 100; // 100毫秒检测一次
+            
+            const detectionTimer = setInterval(() => {
+                detectionCount++;
+                
+                // 检查页面中是否有未渲染的Mermaid代码块
+                const unrenderedMermaidBlocks = findUnrenderedMermaidBlocks();
+                
+                if (unrenderedMermaidBlocks.length > 0) {
+                    console.log(`🔍 检测到 ${unrenderedMermaidBlocks.length} 个未渲染的Mermaid代码块，正在进行渲染...`);
+                    
+                    // 渲染未渲染的Mermaid代码块
+                    unrenderedMermaidBlocks.forEach(block => {
+                        const codeContent = block.textContent.trim();
+                        if (codeContent && isMermaidCode(codeContent)) {
+                            // 创建Mermaid图表容器
+                            const mermaidDiv = document.createElement('div');
+                            mermaidDiv.className = 'mermaid';
+                            mermaidDiv.textContent = codeContent;
+                            mermaidDiv.style.backgroundColor = '#ffffff';
+                            mermaidDiv.style.borderRadius = '8px';
+                            mermaidDiv.style.padding = '20px';
+                            mermaidDiv.style.margin = '20px 0';
+                            mermaidDiv.style.boxShadow = '0 2px 8px rgba(0, 0.1)';
+                            mermaidDiv.style.overflow = 'auto';
+                            mermaidDiv.setAttribute('data-mermaid-code', codeContent);
+                            
+                            // 替换原来的代码块
+                            block.parentNode.replaceChild(mermaidDiv, block);
+                            
+                            // 渲染Mermaid图表
+                            renderMermaidWithRetry(mermaidDiv);
+                        }
+                    });
+                }
+                
+                // 达到最大检测次数或没有未渲染的块时停止检测
+                if (detectionCount >= maxDetections || unrenderedMermaidBlocks.length === 0) {
+                    clearInterval(detectionTimer);
+                    if (detectionCount < maxDetections) {
+                        console.log('✅ Mermaid持续检测完成，所有图表已渲染');
+                    } else {
+                        console.log('⏰ Mermaid持续检测超时，停止检测');
+                    }
+                }
+            }, detectionInterval);
+        }
+
+        // 查找未渲染的Mermaid代码块
+        function findUnrenderedMermaidBlocks() {
+            // 查找所有可能包含Mermaid代码的pre代码块
+            const codeBlocks = document.querySelectorAll('pre code');
+            const unrenderedBlocks = [];
+            
+            codeBlocks.forEach(block => {
+                const codeContent = block.textContent.trim();
+                // 检查是否为Mermaid代码且未被渲染（没有被转换为mermaid类的div）
+                if (codeContent && isMermaidCode(codeContent) && !block.closest('.mermaid')) {
+                    unrenderedBlocks.push(block);
+                }
+            });
+            
+            return unrenderedBlocks;
+        }
+
         function testPreRendering() {
             const content = document.getElementById('content');
             content.innerHTML = `
@@ -349,6 +418,9 @@ sequenceDiagram
             
             // 渲染pre标签内的内容
             renderPreTagMarkdown(content);
+            
+            // 启动持续检测机制
+            startMermaidDetection();
         }
 
         function testMixedContent() {
@@ -389,6 +461,9 @@ function hello() {
             
             // 渲染pre标签内的内容
             renderPreTagMarkdown(content);
+            
+            // 启动持续检测机制
+            startMermaidDetection();
         }
     </script>
 </body>
