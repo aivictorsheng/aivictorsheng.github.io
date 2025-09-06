@@ -555,6 +555,13 @@
         
         function renderStreamingContent(content) {
             console.log('🔄 实时渲染内容，当前长度:', content.length);
+            // 检查Marked.js是否已加载
+            if (typeof marked === 'undefined' || !marked.parse) {
+                console.warn('⚠️ Marked.js未加载，使用原生渲染');
+                renderFallbackContent(content, 'streaming');
+                return;
+            }
+            
             try {
                 // 临时包装内容以确保Markdown解析正确
                 const wrappedContent = content;
@@ -567,21 +574,26 @@
                 
                 // 渲染Mermaid图表
                 renderMermaidDiagrams();
+                
+                // 渲染pre标签内的Markdown内容
+                renderPreTagMarkdown(document.getElementById('metaphorContent'));
                 console.log('✅ 实时内容渲染完成');
             } catch (error) {
                 console.warn('⚠️ 实时渲染过程中出现错误:', error);
-                // 流式渲染过程中可能有不完整的Markdown，暂时忽略错误
-                // 但仍然显示原始内容
-                try {
-                    document.getElementById('metaphorContent').innerHTML = `<div class="markdown-content"><pre>${content}</pre></div>`;
-                } catch (e) {
-                    console.error('💥 显示原始内容时出错:', e);
-                }
+                // 兜底策略：确保内容能够显示
+                renderFallbackContent(content, 'streaming');
             }
         }
         
         function renderMarkdownContent(markdownText) {
             console.log('📝 开始渲染完整Markdown内容，长度:', markdownText.length);
+            // 检查Marked.js是否已加载
+            if (typeof marked === 'undefined' || !marked.parse) {
+                console.warn('⚠️ Marked.js未加载，使用原生渲染');
+                renderFallbackContent(markdownText, 'complete');
+                return;
+            }
+            
             try {
                 // 使用marked渲染Markdown
                 const htmlContent = marked.parse(markdownText);
@@ -593,11 +605,383 @@
                 
                 // 渲染Mermaid图表
                 renderMermaidDiagrams();
+                
+                // 渲染pre标签内的Markdown内容
+                renderPreTagMarkdown(document.getElementById('metaphorContent'));
                 console.log('✅ 完整内容渲染完成');
             } catch (error) {
                 console.error('💥 Markdown渲染错误:', error);
-                document.getElementById('metaphorContent').innerHTML = `<p>内容渲染失败：${error.message}</p><p>${markdownText}</p>`;
+                // 兜底策略：确保内容能够显示
+                renderFallbackContent(markdownText, 'complete');
             }
+        }
+        
+        // 渲染markdown-content下的pre标签内容为Markdown输出
+        function renderPreTagMarkdown(parentElement = document) {
+            try {
+                // 查找所有markdown-content元素下的pre标签
+                const markdownContents = parentElement.querySelectorAll('.markdown-content');
+                markdownContents.forEach(markdownContent => {
+                    const preTags = markdownContent.querySelectorAll('pre');
+                    preTags.forEach(preTag => {
+                        try {
+                            // 获取pre标签内的文本内容
+                            const contentText = preTag.textContent || preTag.innerText;
+                            if (contentText && contentText.trim()) {
+                                const trimmedContent = contentText.trim();
+                                
+                                // 检查是否为Mermaid代码
+                                if (isMermaidCode(trimmedContent)) {
+                                    // 渲染为Mermaid图表
+                                    renderMermaidFromPreTag(trimmedContent, preTag);
+                                } else {
+                                    // 使用marked解析Markdown内容
+                                    if (typeof marked !== 'undefined' && marked.parse) {
+                                        const renderedHtml = marked.parse(trimmedContent);
+                                        // 创建新的div元素包含渲染后的内容
+                                        const newDiv = document.createElement('div');
+                                        newDiv.className = 'markdown-content';
+                                        newDiv.innerHTML = renderedHtml;
+                                        // 用新元素替换原来的pre标签
+                                        preTag.parentNode.replaceChild(newDiv, preTag);
+                                    } else {
+                                        console.warn('⚠️ Marked.js未加载，无法渲染pre标签内容为Markdown');
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.warn('⚠️ 渲染pre标签内容时出错:', error);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.warn('⚠️ 渲染pre标签Markdown时出错:', error);
+            }
+        }
+
+        // 检查是否为Mermaid代码
+        function isMermaidCode(code) {
+            if (!code || code.length === 0) return false;
+            
+            // 检查是否有有效的起始行
+            const firstLine = code.split('\n')[0].trim();
+            const validStarts = ['graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 
+                               'stateDiagram', 'erDiagram', 'gantt', 'pie', 'journey',
+                               'requirementDiagram', 'gitGraph'];
+            
+            return validStarts.some(start => firstLine.startsWith(start));
+        }
+
+        // 从pre标签渲染Mermaid图表
+        function renderMermaidFromPreTag(mermaidCode, originalPreTag) {
+            try {
+                // 创建Mermaid图表容器
+                const mermaidDiv = document.createElement('div');
+                mermaidDiv.className = 'mermaid';
+                mermaidDiv.textContent = mermaidCode;
+                mermaidDiv.style.backgroundColor = '#ffffff';
+                mermaidDiv.style.borderRadius = '8px';
+                mermaidDiv.style.padding = '20px';
+                mermaidDiv.style.margin = '20px 0';
+                mermaidDiv.style.boxShadow = '0 2px 8px rgba(0, 0, 0.1)';
+                mermaidDiv.style.overflow = 'auto';
+                mermaidDiv.setAttribute('data-mermaid-code', mermaidCode); // 保存原始代码用于重试
+                
+                // 用Mermaid图表替换原来的pre标签
+                originalPreTag.parentNode.replaceChild(mermaidDiv, originalPreTag);
+                
+                // 渲染Mermaid图表
+                renderMermaidWithRetry(mermaidDiv);
+            } catch (error) {
+                console.warn('⚠️ 渲染pre标签中的Mermaid图表时出错:', error);
+            }
+        }
+
+        // 带重试机制的Mermaid渲染
+        function renderMermaidWithRetry(mermaidElement, retryCount = 0) {
+            const maxRetries = 5;
+            const retryDelay = 500; // 500ms重试间隔
+            
+            // 检查Mermaid是否已加载并初始化
+            if (typeof mermaid === 'undefined') {
+                if (retryCount < maxRetries) {
+                    console.log(`⏳ Mermaid未加载，${retryDelay}ms后重试 (${retryCount + 1}/${maxRetries})`);
+                    setTimeout(() => renderMermaidWithRetry(mermaidElement, retryCount + 1), retryDelay);
+                } else {
+                    console.warn('⚠️ Mermaid库加载超时，无法渲染图表');
+                    showMermaidFallback(mermaidElement);
+                }
+                return;
+            }
+            
+            // 检查Mermaid是否已初始化
+            if (!mermaid.parseError) {
+                // 尝试初始化Mermaid（如果尚未初始化）
+                try {
+                    if (!mermaid.initializeCalled) {
+                        mermaid.initialize({ 
+                            startOnLoad: false,
+                            theme: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+                            securityLevel: 'loose'
+                        });
+                        mermaid.initializeCalled = true;
+                    }
+                } catch (initError) {
+                    console.warn('⚠️ Mermaid初始化失败:', initError);
+                }
+            }
+            
+            // 使用现代的Mermaid API渲染
+            try {
+                mermaid.run({
+                    nodes: [mermaidElement],
+                    postRenderCallback: (id) => {
+                        console.log('✅ Pre标签中的Mermaid图表渲染完成:', id);
+                    }
+                }).catch((error) => {
+                    if (retryCount < maxRetries) {
+                        console.log(`⏳ Mermaid渲染失败，${retryDelay}ms后重试 (${retryCount + 1}/${maxRetries}):`, error.message);
+                        setTimeout(() => renderMermaidWithRetry(mermaidElement, retryCount + 1), retryDelay);
+                    } else {
+                        console.warn('⚠️ Mermaid渲染重试次数已达上限:', error);
+                        showMermaidFallback(mermaidElement);
+                    }
+                });
+            } catch (e) {
+                if (retryCount < maxRetries) {
+                    console.log(`⏳ Mermaid渲染异常，${retryDelay}ms后重试 (${retryCount + 1}/${maxRetries}):`, e.message);
+                    setTimeout(() => renderMermaidWithRetry(mermaidElement, retryCount + 1), retryDelay);
+                } else {
+                    console.warn('⚠️ Mermaid渲染异常重试次数已达上限:', e);
+                    showMermaidFallback(mermaidElement);
+                }
+            }
+        }
+
+        // Mermaid渲染失败时的降级显示
+        function showMermaidFallback(mermaidElement) {
+            const code = mermaidElement.getAttribute('data-mermaid-code') || mermaidElement.textContent;
+            mermaidElement.innerHTML = `
+                <div style="text-align: left; font-family: monospace; font-size: 12px; color: #666;">
+                    <div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #ffc107;">
+                        <strong>⚠️ Mermaid图表渲染失败</strong><br>
+                        以下是原始Mermaid代码：
+                    </div>
+                    <pre style="background: #f1f3f4; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap;">${escapeHtml(code)}</pre>
+                    <div style="margin-top: 10px; font-size: 11px; color: #888;">
+                        提示：请检查网络连接或刷新页面重试
+                    </div>
+                </div>
+            `;
+        }
+
+        // HTML转义辅助函数
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&',
+                '<': '<',
+                '>': '>',
+                '"': '"',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // 兜底渲染策略：确保内容一定能显示
+        function renderFallbackContent(content, type) {
+            console.log(`🔄 使用兜底策略渲染${type}内容，长度:`, content.length);
+            
+            try {
+                // 策略1: 尝试清理内容并重新渲染
+                const cleanedContent = cleanMarkdownContent(content);
+                if (cleanedContent !== content) {
+                    try {
+                        const htmlContent = marked.parse(cleanedContent);
+                        document.getElementById('metaphorContent').innerHTML = `
+                            <div class="markdown-content">
+                                ${htmlContent}
+                                <div style="margin-top: 20px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404;">
+                                    <strong>⚠️ 内容已自动修复</strong><br>
+                                    原始内容可能存在格式问题，已进行自动修复以确保正常显示。
+                                </div>
+                            </div>
+                        `;
+                        renderMermaidDiagrams();
+                        
+                        // 渲染pre标签内的Markdown内容
+                        renderPreTagMarkdown(document.getElementById('metaphorContent'));
+                        console.log('✅ 兜底策略1成功：清理后渲染完成');
+                        return;
+                    } catch (cleanError) {
+                        console.warn('⚠️ 兜底策略1失败：清理后仍然无法渲染', cleanError);
+                    }
+                }
+                
+                // 策略2: 尝试分段渲染
+                try {
+                    const segmentedContent = segmentMarkdownContent(content);
+                    document.getElementById('metaphorContent').innerHTML = `
+                        <div class="markdown-content">
+                            ${segmentedContent}
+                            <div style="margin-top: 20px; padding: 10px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460;">
+                                <strong>ℹ️ 分段显示模式</strong><br>
+                                内容已分段显示以确保可读性。
+                            </div>
+                        </div>
+                    `;
+                    renderMermaidDiagrams();
+                    
+                    // 渲染pre标签内的Markdown内容
+                    renderPreTagMarkdown(document.getElementById('metaphorContent'));
+                    console.log('✅ 兜底策略2成功：分段渲染完成');
+                    return;
+                } catch (segmentError) {
+                    console.warn('⚠️ 兜底策略2失败：分段渲染也失败了', segmentError);
+                }
+                
+                // 策略3: 完全原生渲染（不依赖任何外部库）
+                try {
+                    const nativeHtmlContent = renderMarkdownNatively(content);
+                    document.getElementById('metaphorContent').innerHTML = `
+                        <div class="markdown-content">
+                            ${nativeHtmlContent}
+                            <div style="margin-top: 20px; padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
+                                <strong>✅ 原生渲染模式</strong><br>
+                                使用内置渲染器显示内容，确保在任何环境下都能正常显示。
+                            </div>
+                        </div>
+                    `;
+                    console.log('✅ 兜底策略3成功：原生渲染完成');
+                    return;
+                } catch (nativeError) {
+                    console.warn('⚠️ 兜底策略3失败：原生渲染也失败了', nativeError);
+                }
+                
+                // 策略4: 纯文本显示（最终兜底）
+                document.getElementById('metaphorContent').innerHTML = `
+                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333;">
+                        <h3 style="color: #dc3545; margin-bottom: 15px;">⚠️ Markdown渲染失败</h3>
+                        <p style="margin-bottom: 15px;">已启用最终兜底策略，以下是原始内容：</p>
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #dee2e6; white-space: pre-wrap; font-family: monospace; font-size: 14px; color: #495057;">
+                            ${escapeHtml(content)}
+                        </div>
+                        <div style="margin-top: 15px; padding: 10px; background: #e2e3e5; border: 1px solid #d6d8db; border-radius: 4px; color: #383d41; font-size: 12px;">
+                            <strong>🔧 技术信息：</strong><br>
+                            渲染类型: ${type}<br>
+                            内容长度: ${content.length} 字符<br>
+                            这种显示方式确保了内容的完整性和可读性。
+                        </div>
+                    </div>
+                `;
+                console.log('✅ 兜底策略4成功：纯文本显示完成');
+                
+            } catch (finalError) {
+                console.error('💥 所有兜底策略都失败了:', finalError);
+                // 最终的最终兜底：简单显示
+                document.getElementById('metaphorContent').innerHTML = `
+                    <div style="padding: 20px; font-family: Arial, sans-serif;">
+                        <h3 style="color: #333;">内容显示</h3>
+                        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; white-space: pre-wrap; overflow-wrap: break-word;">${content}</pre>
+                    </div>
+                `;
+            }
+        }
+        
+        // 清理Markdown内容的辅助函数
+        function cleanMarkdownContent(content) {
+            if (!content) return '';
+            
+            // 移除可能导致问题的特殊字符
+            let cleaned = content
+                .replace(/\u0000/g, '') // 移除空字符
+                .replace(/\uFFFD/g, '') // 移除替换字符
+                .replace(/[^\x20-\x7E\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\u00A0-\u00FF\u2000-\u206F\u2E00-\u2E7F\u3000-\u303F\uFF00-\uFFEF]/g, '') // 保留常见字符
+                .trim();
+            
+            // 确保代码块正确闭合
+            const codeBlockRegex = /```[\s\S]*?```/g;
+            let codeBlocks = cleaned.match(codeBlockRegex) || [];
+            
+            // 如果代码块数量为奇数，添加闭合标记
+            const codeBlockCount = (cleaned.match(/```/g) || []).length;
+            if (codeBlockCount % 2 === 1) {
+                cleaned += '\n```';
+            }
+            
+            return cleaned;
+        }
+        
+        // 分段Markdown内容的辅助函数
+        function segmentMarkdownContent(content) {
+            if (!content) return '';
+            
+            try {
+                // 使用marked解析
+                return marked.parse(content);
+            } catch (error) {
+                // 如果解析失败，手动分段
+                const lines = content.split('\n');
+                let html = '';
+                let inCodeBlock = false;
+                let codeBlockContent = '';
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    
+                    if (line.trim().startsWith('```')) {
+                        if (inCodeBlock) {
+                            // 结束代码块
+                            html += `<pre><code>${escapeHtml(codeBlockContent)}</code></pre>`;
+                            codeBlockContent = '';
+                            inCodeBlock = false;
+                        } else {
+                            // 开始代码块
+                            inCodeBlock = true;
+                            codeBlockContent = '';
+                        }
+                    } else if (inCodeBlock) {
+                        codeBlockContent += line + '\n';
+                    } else {
+                        // 普通文本行
+                        if (line.trim().startsWith('#')) {
+                            const level = line.match(/^#+/)[0].length;
+                            const text = line.replace(/^#+\s*/, '');
+                            html += `<h${level}>${escapeHtml(text)}</h${level}>`;
+                        } else if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+                            if (i === 0 || !lines[i-1].trim().startsWith('* ') && !lines[i-1].trim().startsWith('- ')) {
+                                html += '<ul>';
+                            }
+                            html += `<li>${escapeHtml(line.trim().substring(2))}</li>`;
+                            if (i === lines.length - 1 || !lines[i+1].trim().startsWith('* ') && !lines[i+1].trim().startsWith('- ')) {
+                                html += '</ul>';
+                            }
+                        } else if (line.trim() !== '') {
+                            html += `<p>${escapeHtml(line)}</p>`;
+                        }
+                    }
+                }
+                
+                // 如果代码块没有闭合，强制闭合
+                if (inCodeBlock) {
+                    html += `<pre><code>${escapeHtml(codeBlockContent)}</code></pre>`;
+                }
+                
+                return html;
+            }
+        }
+        
+        // HTML转义辅助函数
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&',
+                '<': '<',
+                '>': '>',
+                '"': '"',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
         
         function renderMermaidDiagrams() {
@@ -727,6 +1111,167 @@
                                'requirementDiagram', 'gitGraph'];
             
             return validStarts.some(start => firstLine.startsWith(start));
+        }
+        
+        // 完全原生的Markdown渲染函数（不依赖任何外部库）
+        function renderMarkdownNatively(markdown) {
+            if (!markdown) return '<p></p>';
+            
+            try {
+                let html = '';
+                const lines = markdown.split('\n');
+                let inCodeBlock = false;
+                let codeBlockContent = '';
+                let inBlockquote = false;
+                let blockquoteContent = '';
+                let listType = null; // 'ul' or 'ol'
+                let listItems = [];
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trimEnd();
+                    
+                    // 处理代码块
+                    if (line.trim().startsWith('```')) {
+                        if (inCodeBlock) {
+                            // 结束代码块
+                            html += `<pre><code>${escapeHtml(codeBlockContent.trim())}</code></pre>`;
+                            codeBlockContent = '';
+                            inCodeBlock = false;
+                            continue;
+                        } else {
+                            // 开始代码块
+                            inCodeBlock = true;
+                            codeBlockContent = '';
+                            continue;
+                        }
+                    }
+                    
+                    if (inCodeBlock) {
+                        codeBlockContent += line + '\n';
+                        continue;
+                    }
+                    
+                    // 处理空行
+                    if (line.trim() === '') {
+                        if (inBlockquote) {
+                            html += `<blockquote>${renderInlineMarkdown(blockquoteContent.trim())}</blockquote>`;
+                            inBlockquote = false;
+                            blockquoteContent = '';
+                        }
+                        if (listType) {
+                            const listTag = listType;
+                            html += `<${listTag}>${listItems.map(item => `<li>${renderInlineMarkdown(item.trim())}</li>`).join('')}</${listTag}>`;
+                            listType = null;
+                            listItems = [];
+                        }
+                        html += '<p></p>';
+                        continue;
+                    }
+                    
+                    // 处理标题
+                    if (line.startsWith('#')) {
+                        const level = line.match(/^#+/)[0].length;
+                        const text = line.replace(/^#+\s*/, '');
+                        html += `<h${level}>${renderInlineMarkdown(text)}</h${level}>`;
+                        continue;
+                    }
+                    
+                    // 处理引用块
+                    if (line.startsWith('>')) {
+                        if (!inBlockquote) {
+                            inBlockquote = true;
+                            blockquoteContent = '';
+                        }
+                        blockquoteContent += line.substring(1).trim() + ' ';
+                        continue;
+                    } else if (inBlockquote) {
+                        html += `<blockquote>${renderInlineMarkdown(blockquoteContent.trim())}</blockquote>`;
+                        inBlockquote = false;
+                        blockquoteContent = '';
+                    }
+                    
+                    // 处理列表
+                    if (line.startsWith('- ') || line.startsWith('* ')) {
+                        if (listType !== 'ul') {
+                            if (listType) {
+                                html += `<${listType}>${listItems.map(item => `<li>${renderInlineMarkdown(item.trim())}</li>`).join('')}</${listType}>`;
+                            }
+                            listType = 'ul';
+                            listItems = [];
+                        }
+                        listItems.push(line.substring(2));
+                        continue;
+                    } else if (line.match(/^\d+\.\s/)) {
+                        if (listType !== 'ol') {
+                            if (listType) {
+                                html += `<${listType}>${listItems.map(item => `<li>${renderInlineMarkdown(item.trim())}</li>`).join('')}</${listType}>`;
+                            }
+                            listType = 'ol';
+                            listItems = [];
+                        }
+                        listItems.push(line.replace(/^\d+\.\s/, ''));
+                        continue;
+                    } else if (listType) {
+                        html += `<${listType}>${listItems.map(item => `<li>${renderInlineMarkdown(item.trim())}</li>`).join('')}</${listType}>`;
+                        listType = null;
+                        listItems = [];
+                    }
+                    
+                    // 处理水平线
+                    if (line === '---' || line === '***') {
+                        html += '<hr>';
+                        continue;
+                    }
+                    
+                    // 普通段落
+                    html += `<p>${renderInlineMarkdown(line)}</p>`;
+                }
+                
+                // 处理最后可能未闭合的代码块
+                if (inCodeBlock) {
+                    html += `<pre><code>${escapeHtml(codeBlockContent.trim())}</code></pre>`;
+                }
+                
+                // 处理最后可能未闭合的引用块
+                if (inBlockquote) {
+                    html += `<blockquote>${renderInlineMarkdown(blockquoteContent.trim())}</blockquote>`;
+                }
+                
+                // 处理最后可能未闭合的列表
+                if (listType) {
+                    html += `<${listType}>${listItems.map(item => `<li>${renderInlineMarkdown(item.trim())}</li>`).join('')}</${listType}>`;
+                }
+                
+                return html;
+            } catch (error) {
+                console.error('💥 原生Markdown渲染失败:', error);
+                // 如果原生渲染也失败，返回转义后的纯文本
+                return `<pre>${escapeHtml(markdown)}</pre>`;
+            }
+        }
+        
+        // 内联Markdown渲染函数
+        function renderInlineMarkdown(text) {
+            if (!text) return '';
+            
+            try {
+                // 处理粗体 **text**
+                text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                // 处理斜体 *text*
+                text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                // 处理行内代码 `code`
+                text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+                
+                // 处理链接 [text](url)
+                text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+                
+                return text;
+            } catch (error) {
+                console.error('💥 内联Markdown渲染失败:', error);
+                return escapeHtml(text);
+            }
         }
         
         function closeSidebar() {
