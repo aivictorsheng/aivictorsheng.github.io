@@ -372,7 +372,10 @@
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), timeout);
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    console.warn('⏰ API请求超时，已中止请求');
+                }, timeout);
                 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -423,7 +426,7 @@
                 }
             } catch (error) {
                 console.error('💥 API调用发生错误:', error);
-                if (error.name === 'AbortError') {
+                if (error.name === 'AbortError' || error.message.includes('timeout') || error.message.includes('超时')) {
                     throw new Error('请求超时：网络连接可能较慢，请稍后重试');
                 }
                 throw new Error(`网络错误: ${error.message}`);
@@ -1333,3 +1336,4 @@
     </script>
 </body>
 </html>
+
